@@ -2,6 +2,7 @@
 import HelloWorld from './components/HelloWorld.vue'
 import TheWelcome from './components/TheWelcome.vue'
 import JSON from './components/JSON.vue' // <-- Import JSON.vue
+import Form from './components/Form.vue'
 </script>
 
 <template>
@@ -16,7 +17,7 @@ import JSON from './components/JSON.vue' // <-- Import JSON.vue
   <main>
     <TheWelcome />
     <JSON />
-    <!-- <-- Added JSON.vue component here -->
+    <Form />
   </main>
 </template>
 
