@@ -6,7 +6,6 @@
     <p><input type="text" placeholder="Email" v-model="email" /></p>
     <p><input type="password" placeholder="Password" v-model="password" /></p>
 
-    
     <p>
       <label>Role:&nbsp;</label>
       <select v-model="role">
@@ -17,36 +16,37 @@
 
     <p>
       <button @click="signin">Sign in via Firebase</button>
+      <button v-if="signedIn" @click="doSignOut" style="margin-left:.5rem">Log out</button>
     </p>
 
-    <div v-if="signedIn" class="result">
-      <p>Signed in as: <b>{{ email }}</b></p>
-      <p>Selected role (client-side): <b>{{ role }}</b></p>
-      <small>
-        Open DevTools → Console to see <code>currentUser</code> and role logs.
-      </small>
-    </div>
-  </div>
+   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from "vue"
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth"
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth"
 
-const auth = getAuth()                 
+const auth = getAuth() // uses your initialized Firebase app
 
 const email = ref("")
 const password = ref("")
-const role = ref("library_visitor")    // "library_staff" | "library_visitor"
+const role = ref("library_visitor") // "library_staff" | "library_visitor"
 const signedIn = ref(false)
 
 onMounted(() => {
-  // Expose auth for manual inspection in the Console:
+  // helpful for manual inspection
   window.__auth = auth
   console.log("Auth ready. Try __auth.currentUser in the Console.")
   onAuthStateChanged(auth, (user) => {
     console.log("Auth state changed:", user) // null or _UserImpl
+    signedIn.value = !!user
   })
+
+  
+  const savedRole = sessionStorage.getItem("role")
+  if (savedRole) role.value = savedRole
+  const savedEmail = sessionStorage.getItem("email")
+  if (savedEmail) email.value = savedEmail
 })
 
 const signin = async () => {
@@ -58,7 +58,7 @@ const signin = async () => {
     sessionStorage.setItem("email", email.value)
 
     console.log("Firebase sign-in successful!")
-    console.log("currentUser after sign-in:", auth.currentUser) 
+    console.log("currentUser after sign-in:", auth.currentUser) // _UserImpl
     console.log("Selected role (client-side demo):", role.value)
 
     signedIn.value = true
@@ -66,6 +66,15 @@ const signin = async () => {
     console.log(err.code, err.message)
     signedIn.value = false
   }
+}
+
+const doSignOut = async () => {
+  console.log("Before signOut →", auth.currentUser) // should be _UserImpl
+  await signOut(auth)
+  sessionStorage.removeItem("role")
+  sessionStorage.removeItem("email")
+  console.log("After signOut →", auth.currentUser)  // should be null
+  signedIn.value = false
 }
 </script>
 
