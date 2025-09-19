@@ -16,47 +16,45 @@
 
     <hr />
 
-    <h2>Manage Books (Update / Delete)</h2>
+    <!-- ====== SCREENSHOT SET 2: where / orderBy / limit ====== -->
+    <h2>Query Books (where / orderBy / limit)</h2>
+
+    <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.75rem">
+      <button @click="runWhere">where('isbn', '>', 1000)</button>
+      <button @click="runOrderByName">orderBy('name','asc')</button>
+      <button @click="runOrderByIsbnLimit">orderBy('isbn','desc') + limit(3)</button>
+      <button @click="runWhereOrderByLimit">where('isbn','>=',1000) + orderBy('isbn') + limit(5)</button>
+    </div>
+
+    <p><b>Active query:</b> {{ activeQuery }}</p>
+
     <ul v-if="books.length">
-      <li v-for="b in books" :key="b.id" style="margin-bottom:.5rem">
-        <input v-model="b.name" placeholder="Book name" />
-        <input v-model="b.isbn" placeholder="ISBN" style="width:120px;margin-left:.5rem" />
-        <button @click="updateBook(b)" style="margin-left:.5rem">Update</button>
-        <button @click="deleteBook(b.id)" style="margin-left:.25rem">Delete</button>
-        <small style="margin-left:.5rem;opacity:.7">docId: {{ b.id }}</small>
+      <li v-for="b in books" :key="b.id">
+        {{ b.name }} – ISBN: {{ b.isbn }} <small style="opacity:.6">[docId: {{ b.id }}]</small>
       </li>
     </ul>
-    <p v-else>No books yet.</p>
+    <p v-else>No results.</p>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import db from '../firebase/init.js'
 import {
   collection,
   addDoc,
-  onSnapshot,
-  doc,
-  updateDoc,
-  deleteDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  limit,
 } from 'firebase/firestore'
 
 export default {
   setup() {
+    // add form
     const isbn = ref('')
     const name = ref('')
-    const books = ref([])
-
-    // Live list (easier to show updates/deletes in your screenshot)
-    let unsubscribe = null
-    onMounted(() => {
-      const colRef = collection(db, 'books')
-      unsubscribe = onSnapshot(colRef, snap => {
-        books.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      })
-    })
-    onUnmounted(() => unsubscribe && unsubscribe())
 
     const addBook = async () => {
       try {
@@ -66,7 +64,7 @@ export default {
           return
         }
         await addDoc(collection(db, 'books'), {
-          isbn: isbnNumber,
+          isbn: isbnNumber,       // store as number so numeric queries work
           name: name.value,
         })
         isbn.value = ''
@@ -77,28 +75,53 @@ export default {
       }
     }
 
-    const updateBook = async (b) => {
-      try {
-        const docRef = doc(db, 'books', b.id)
-        const nextIsbn = isNaN(Number(b.isbn)) ? b.isbn : Number(b.isbn)
-        await updateDoc(docRef, { name: b.name, isbn: nextIsbn })
-        alert('Book updated!')
-      } catch (error) {
-        console.error('Error updating book: ', error)
-      }
+    // query demo state
+    const books = ref([])
+    const activeQuery = ref('—')
+
+    const load = async (q, label) => {
+      activeQuery.value = label
+      const snap = await getDocs(q)
+      books.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      console.log(`[Query] ${label}`, books.value)
     }
 
-    const deleteBook = async (id) => {
-      try {
-        if (!confirm('Delete this book?')) return
-        await deleteDoc(doc(db, 'books', id))
-        alert('Book deleted.')
-      } catch (error) {
-        console.error('Error deleting book: ', error)
-      }
+    // 1) where
+    const runWhere = async () => {
+      const q1 = query(collection(db, 'books'), where('isbn', '>', 1000))
+      await load(q1, `where('isbn','>',1000)`)
     }
 
-    return { isbn, name, books, addBook, updateBook, deleteBook }
+    // 2) orderBy
+    const runOrderByName = async () => {
+      const q2 = query(collection(db, 'books'), orderBy('name', 'asc'))
+      await load(q2, `orderBy('name','asc')`)
+    }
+
+    // 3) orderBy + limit
+    const runOrderByIsbnLimit = async () => {
+      const q3 = query(collection(db, 'books'), orderBy('isbn', 'desc'), limit(3))
+      await load(q3, `orderBy('isbn','desc') + limit(3)`)
+    }
+
+    // 4) where + orderBy (same field) + limit (no composite index needed)
+    const runWhereOrderByLimit = async () => {
+      const q4 = query(
+        collection(db, 'books'),
+        where('isbn', '>=', 1000),
+        orderBy('isbn', 'asc'),
+        limit(5)
+      )
+      await load(q4, `where('isbn','>=',1000) + orderBy('isbn','asc') + limit(5)`)
+    }
+
+    return {
+      // add form
+      isbn, name, addBook,
+      // queries
+      books, activeQuery,
+      runWhere, runOrderByName, runOrderByIsbnLimit, runWhereOrderByLimit,
+    }
   },
 }
 </script>
